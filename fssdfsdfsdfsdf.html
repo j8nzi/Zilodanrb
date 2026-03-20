@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Obby Pro - Mobile & Random</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; touch-action: none; }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
+            background: white; border-radius: 50%; transform: translate(-50%, -50%);
+            z-index: 100; pointer-events: none; border: 1px solid black;
+        }
+        #ui { position: absolute; width: 100%; height: 100%; z-index: 200; pointer-events: none; }
+        .screen { 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.85); color: white; width: 100%; height: 100%; 
+            pointer-events: auto; text-align: center;
+        }
+        button { 
+            padding: 20px 50px; font-size: 24px; background: #00e676; border: none; 
+            border-radius: 15px; font-weight: bold; cursor: pointer; color: black;
+            box-shadow: 0 5px 0 #00a050;
+        }
+        
+        /* Mobile Controls */
+        #mobile-controls {
+            position: absolute; bottom: 40px; width: 100%; display: none;
+            justify-content: space-between; padding: 0 30px; box-sizing: border-box; z-index: 150;
+        }
+        #joystick-area { width: 120px; height: 120px; background: rgba(255,255,255,0.1); border: 2px solid white; border-radius: 50%; position: relative; pointer-events: auto; }
+        #joystick-stick { width: 50px; height: 50px; background: white; border-radius: 50%; position: absolute; top: 35px; left: 35px; }
+        #jump-btn { width: 90px; height: 90px; background: rgba(255,255,255,0.2); border: 3px solid white; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; font-size: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="crosshair"></div>
+    <div id="ui">
+        <div id="menu-screen" class="screen">
+            <h1 style="font-size: 40px;">OBBY MOBILE PRO</h1>
+            <p>Lava ist jedes Mal woanders!</p>
+            <button onclick="startGame()">START</button>
+        </div>
+        <div id="death-screen" class="screen" style="display:none">
+            <h1 style="color:#ff5252">GEFALLEN!</h1>
+            <button onclick="resetGame()">RETRY</button>
+        </div>
+    </div>
+
+    <div id="mobile-controls">
+        <div id="joystick-area"><div id="joystick-stick"></div></div>
+        <div id="jump-btn">JUMP</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, player, platforms = [];
+        let isPlaying = false, keys = {}, velocityY = 0, lastOnGroundTime = 0;
+        let yaw = 0, pitch = 0.3, camDist = 15;
+        let isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        let joystickPos = { x: 0, y: 0 }, joystickActive = false;
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            const light = new THREE.DirectionalLight(0xffffff, 0.8);
+            light.position.set(10, 20, 10);
+            scene.add(light);
+
+            generateWorld();
+
+            // Spieler Skin
+            player = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.6), new THREE.MeshPhongMaterial({ color: 0x0000ff }));
+            body.position.y = 1.1;
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), new THREE.MeshPhongMaterial({ color: 0xffdbac }));
+            head.position.y = 2.1;
+            player.add(body, head);
+            scene.add(player);
+
+            if(isMobile) {
+                document.getElementById('mobile-controls').style.display = 'flex';
+                setupMobile();
+            }
+
+            // PC Zoom & Kamera
+            window.addEventListener('wheel', (e) => { camDist = Math.max(5, Math.min(40, camDist + e.deltaY * 0.05)); });
+            document.addEventListener('mousemove', (e) => {
+                if (document.pointerLockElement === document.body) {
+                    yaw -= e.movementX * 0.003;
+                    pitch = Math.max(0.1, Math.min(1.4, pitch + e.movementY * 0.003));
+                }
+            });
+            window.onkeydown = (e) => keys[e.code] = true;
+            window.onkeyup = (e) => keys[e.code] = false;
+        }
+
+        function generateWorld() {
+            // Alte Plattformen löschen
+            platforms.forEach(p => scene.remove(p));
+            platforms = [];
+
+            // Start
+            const start = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 10), new THREE.MeshPhongMaterial({ color: 0x555555 }));
+            scene.add(start);
+            platforms.push(start);
+
+            // Zufällige Obby Wege
+            for (let i = 1; i <= 25; i++) {
+                const p = new THREE.Mesh(new THREE.BoxGeometry(6, 0.8, 6), new THREE.MeshPhongMaterial({ color: 0x2ecc71 }));
+                p.position.set(Math.sin(i * 1.6) * 8, 0, -i * 12);
+                scene.add(p);
+                platforms.push(p);
+
+                // Echte Random Lava (Nur in Ecken, nur selten)
+                if (Math.random() > 0.8) {
+                    const lava = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.2, 1.8), new THREE.MeshPhongMaterial({ color: 0xff0000 }));
+                    const cornerX = Math.random() > 0.5 ? 2 : -2;
+                    const cornerZ = Math.random() > 0.5 ? 2 : -2;
+                    lava.position.set(cornerX, 0.5, cornerZ);
+                    lava.name = "lava";
+                    p.add(lava);
+                }
+            }
+
+            // Ziel
+            const goal = new THREE.Mesh(new THREE.BoxGeometry(20, 1, 20), new THREE.MeshPhongMaterial({ color: 0x333333 }));
+            goal.position.set(0, -0.2, -320);
+            scene.add(goal);
+            platforms.push(goal);
+        }
+
+        function setupMobile() {
+            const area = document.getElementById('joystick-area');
+            const stick = document.getElementById('joystick-stick');
+            
+            area.addEventListener('touchstart', (e) => { joystickActive = true; e.preventDefault(); }, {passive: false});
+            area.addEventListener('touchmove', (e) => {
+                const t = e.touches[0];
+                const r = area.getBoundingClientRect();
+                const dx = t.clientX - (r.left + 60);
+                const dy = t.clientY - (r.top + 60);
+                const d = Math.min(Math.sqrt(dx*dx+dy*dy), 50);
+                const ang = Math.atan2(dy, dx);
+                joystickPos.x = (Math.cos(ang) * d) / 50;
+                joystickPos.y = (Math.sin(ang) * d) / 50;
+                stick.style.transform = `translate(${joystickPos.x*50}px, ${joystickPos.y*50}px)`;
+            });
+            area.addEventListener('touchend', () => { joystickActive = false; joystickPos = {x:0,y:0}; stick.style.transform = 'none'; });
+            
+            document.getElementById('jump-btn').addEventListener('touchstart', (e) => { e.preventDefault(); jump(); });
+
+            let lastX, lastY;
+            document.addEventListener('touchmove', (e) => {
+                const t = e.touches[e.touches.length-1];
+                if(t.clientX > window.innerWidth/2) { // Rechte Seite für Kamera
+                    if(lastX) {
+                        yaw -= (t.clientX - lastX) * 0.01;
+                        pitch = Math.max(0.1, Math.min(1.4, pitch + (t.clientY - lastY) * 0.01));
+                    }
+                    lastX = t.clientX; lastY = t.clientY;
+                }
+            }, {passive: false});
+            document.addEventListener('touchend', () => { lastX = null; lastY = null; });
+        }
+
+        function jump() {
+            if (Date.now() - lastOnGroundTime < 200) {
+                velocityY = 0.4;
+                lastOnGroundTime = 0;
+            }
+        }
+
+        function startGame() {
+            document.getElementById('menu-screen').style.display = 'none';
+            isPlaying = true;
+            if(!isMobile) document.body.requestPointerLock();
+        }
+
+        function resetGame() {
+            generateWorld(); // Neue Lava-Positionen!
+            player.position.set(0, 3, 0); velocityY = 0;
+            document.getElementById('death-screen').style.display = 'none';
+            isPlaying = true;
+            if(!isMobile) document.body.requestPointerLock();
+        }
+
+        function update() {
+            if (!isPlaying) return;
+            const speed = 0.22;
+            let mX = 0, mZ = 0;
+
+            if (keys['KeyW']) mZ -= 1;
+            if (keys['KeyS']) mZ += 1;
+            if (keys['KeyA']) mX -= 1;
+            if (keys['KeyD']) mX += 1;
+            if (keys['Space']) jump();
+            if (joystickActive) { mX = joystickPos.x; mZ = joystickPos.y; }
+
+            if (mX !== 0 || mZ !== 0) {
+                player.position.x += (Math.cos(yaw) * mX + Math.sin(yaw) * mZ) * speed;
+                player.position.z += (-Math.sin(yaw) * mX + Math.cos(yaw) * mZ) * speed;
+            }
+
+            velocityY -= 0.02; 
+            player.position.y += velocityY;
+
+            let onG = false;
+            platforms.forEach(p => {
+                const dx = Math.abs(player.position.x - p.position.x);
+                const dz = Math.abs(player.position.z - p.position.z);
+                if(dx < 3.2 && dz < 3.2 && player.position.y < p.position.y+1.2 && player.position.y > p.position.y) {
+                    player.position.y = p.position.y+0.1; velocityY = 0; onG = true;
+                    // Lava Check
+                    p.children.forEach(child => {
+                        if(child.name === "lava") {
+                            let worldLava = new THREE.Vector3();
+                            child.getWorldPosition(worldLava);
+                            if(player.position.distanceTo(worldLava) < 1.3) die();
+                        }
+                    });
+                }
+            });
+
+            if(onG) lastOnGroundTime = Date.now();
+            if(player.position.y < -15) die();
+
+            camera.position.set(player.position.x + Math.sin(yaw)*Math.cos(pitch)*camDist, player.position.y + 4 + Math.sin(pitch)*camDist, player.position.z + Math.cos(yaw)*Math.cos(pitch)*camDist);
+            camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
+            renderer.render(scene, camera);
+        }
+
+        function die() {
+            isPlaying = false;
+            document.getElementById('death-screen').style.display = 'flex';
+            if(!isMobile) document.exitPointerLock();
+        }
+
+        init();
+        function animate() { requestAnimationFrame(animate); update(); }
+        animate();
+    </script>
+</body>
+</html>
