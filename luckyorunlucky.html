@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Lucky or Unlucky Web</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;transition:0.3s;background:#121212;color:#fff;}
+.box,.menu,.settings,.game,.account,.admin{padding:30px;border-radius:15px;width:360px;box-shadow:0 0 20px rgba(0,0,0,0.6);transition:0.3s;position:relative;background:#1f1f1f;}
+input,button{width:100%;padding:12px;margin-top:10px;border-radius:8px;border:none;font-size:16px;}
+button{background:#3b82f6;color:white;cursor:pointer;}
+button:hover{background:#2563eb;}
+#msg,#gameMsg,#accountInfo,#globalMessage{margin-top:15px;font-size:16px;}
+.menu-option,.setting-option,.game-button{padding:12px;margin-top:12px;border-radius:8px;cursor:pointer;transition:0.2s;background:#333;color:#fff;font-size:16px;}
+.menu-option:hover,.setting-option:hover,.game-button:hover{background:#444;}
+.subtitle{font-size:16px;opacity:0.8;margin-bottom:20px;}
+.close-btn{position:absolute;top:12px;right:12px;font-size:20px;cursor:pointer;}
+.account-header{display:flex;justify-content:space-between;font-size:16px;margin-bottom:20px;}
+.account-header span{font-weight:bold;}
+.account-info{font-size:16px;line-height:1.5;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="box" id="loginBox">
+<h2>LOGIN</h2>
+<p class="subtitle">Lucky or Unlucky</p>
+<label>Name:</label><input id="name" type="text">
+<label>Code:</label><input id="code" type="text">
+<label>Securitycode:</label><input id="sec" type="text">
+<button onclick="login()">Login</button>
+<p id="msg"></p>
+</div>
+
+<!-- MENU -->
+<div class="menu" id="menuBox" style="display:none;">
+<h2 id="welcome"></h2>
+<div class="menu-option" onclick="openSettings()">🔧 Einstellungen</div>
+<div class="menu-option" onclick="showLuckyButton()">🎲 Spiele</div>
+<div class="menu-option" onclick="openAccount()">👤 Konto</div>
+<div class="menu-option">📁 Dateien</div>
+<div class="menu-option" onclick="openAdmin()">🛠 Admin/Owner</div>
+<div class="menu-option" onclick="logout()">🚪 Logout</div>
+</div>
+
+<!-- SETTINGS -->
+<div class="settings" id="settingsBox" style="display:none;">
+<span class="close-btn" onclick="closeSettings()">✖</span>
+<h3>Einstellungen</h3>
+<div class="setting-option" onclick="toggleTheme()">🎨 Schwarz / Weiß Thema</div>
+</div>
+
+<!-- GAME -->
+<div class="game" id="gameBox" style="display:none;">
+<span class="close-btn" onclick="closeGame()">✖</span>
+<h3>Spiele</h3>
+<div id="luckyButtonContainer"><button class="game-button" onclick="startLuckyGame()">🎲 Lucky or Unlucky</button></div>
+<div id="actualGame" style="display:none;margin-top:15px;">
+<button class="game-button" onclick="playLucky()">Roll</button>
+<p id="gameMsg">Klicke auf Roll um zu spielen.</p>
+</div>
+</div>
+
+<!-- ACCOUNT -->
+<div class="account" id="accountBox" style="display:none;">
+<span class="close-btn" onclick="closeAccount()">✖</span>
+<h3>Mein Konto</h3>
+<div class="account-header">
+<span id="diamondsDisplay">Diamonds: 0</span>
+<span id="coinsDisplay">Coins: 0</span>
+</div>
+<div class="account-info" id="accountInfo"></div>
+</div>
+
+<!-- ADMIN -->
+<div class="admin" id="adminPanel" style="display:none;">
+<span class="close-btn" onclick="closeAdmin()">✖</span>
+<h2>Admin Commands</h2>
+<h3>🔨 User bannen</h3>
+<input id="banName" placeholder="User Name">
+<input id="banDays" placeholder="Tage" type="number">
+<button onclick="banUser()">Ban</button>
+<h3>💰 Coins geben</h3>
+<input id="giveName" placeholder="User Name">
+<input id="giveCoinsAmount" placeholder="Menge" type="number">
+<button onclick="giveCoins()">Give Coins</button>
+<h3>📢 Say</h3>
+<input id="sayMessage" placeholder="Nachricht">
+<button onclick="adminSay()">Send</button>
+</div>
+
+<div id="globalMessage" style="position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#333; padding:10px 20px; border-radius:8px; color:white; font-size:18px;"></div>
+
+<script>
+// USERS
+const users = [
+{name:"Daniel",code:"",security:"1337345Dan!",coins:0,diamonds:0},
+{name:"M-67",code:"67",security:"omaramadungdung",coins:0,diamonds:0},
+{name:"Omar",code:"kuh 45",security:"4530",coins:0,diamonds:0},
+{name:"haumudisigma",code:"9978",security:"789",coins:0,diamonds:0},
+{name:"Owner+",code:"infsigma",security:"inf aura",coins:0,diamonds:0},
+{name:"Owners",code:"Ownersonly",security:"imaowner",coins:0,diamonds:0,role:"admin"}
+];
+
+let currentUser = null;
+let darkTheme = true;
+let yesCount = 0;
+let noCount = 0;
+
+// THEME
+function applyTheme(){
+if(darkTheme){
+document.body.style.background='#121212';
+document.body.style.color='#fff';
+document.querySelectorAll('.box,.menu,.settings,.game,.account,.admin').forEach(el=>el.style.background='#1f1f1f');
+document.querySelectorAll('.menu-option,.setting-option,.game-button').forEach(el=>{el.style.background='#333';el.style.color='#fff';});
+}else{
+document.body.style.background='#f0f0f0';
+document.body.style.color='#000';
+document.querySelectorAll('.box,.menu,.settings,.game,.account,.admin').forEach(el=>el.style.background='#fff');
+document.querySelectorAll('.menu-option,.setting-option,.game-button').forEach(el=>{el.style.background='#e5e5e5';el.style.color='#000';});
+}
+}
+function toggleTheme(){darkTheme=!darkTheme;applyTheme();}
+
+// LOGIN
+function loadUserData(user){
+user.coins=parseInt(localStorage.getItem(user.name+'_coins'))||0;
+user.diamonds=parseInt(localStorage.getItem(user.name+'_diamonds'))||0;
+}
+function saveUserData(){
+if(currentUser){
+localStorage.setItem(currentUser.name+'_coins',currentUser.coins);
+localStorage.setItem(currentUser.name+'_diamonds',currentUser.diamonds);
+}
+}
+function login(){
+let nameInput=document.getElementById('name').value.trim();
+let codeInput=document.getElementById('code').value.trim();
+let secInput=document.getElementById('sec').value.trim();
+let msg=document.getElementById('msg');
+let found=users.find(u=>u.name===nameInput && u.code===codeInput && u.security===secInput);
+if(found){
+currentUser=found;
+loadUserData(currentUser);
+msg.style.color='lightgreen';
+msg.textContent='Login erfolgreich!';
+document.getElementById('loginBox').style.display='none';
+document.getElementById('menuBox').style.display='block';
+document.getElementById('welcome').textContent='Willkommen, '+found.name+'!';
+updateAccountDisplay();
+}else{msg.style.color='red';msg.textContent='Falsche Daten!';}
+}
+
+// LOGOUT
+function logout(){saveUserData();currentUser=null;document.getElementById('menuBox').style.display='none';document.getElementById('loginBox').style.display='block';document.getElementById('msg').textContent='';}
+
+// SETTINGS
+function openSettings(){document.getElementById('menuBox').style.display='none';document.getElementById('settingsBox').style.display='block';}
+function closeSettings(){document.getElementById('settingsBox').style.display='none';document.getElementById('menuBox').style.display='block';}
+
+// GAME
+function showLuckyButton(){document.getElementById('menuBox').style.display='none';document.getElementById('gameBox').style.display='block';document.getElementById('luckyButtonContainer').style.display='block';document.getElementById('actualGame').style.display='none';yesCount=0;noCount=0;document.getElementById('gameMsg').textContent='';}
+function startLuckyGame(){document.getElementById('luckyButtonContainer').style.display='none';document.getElementById('actualGame').style.display='block';document.getElementById('gameMsg').textContent='Klicke auf Roll um zu spielen.';yesCount=0;noCount=0;}
+function closeGame(){saveUserData();document.getElementById('gameBox').style.display='none';document.getElementById('menuBox').style.display='block';}
+function playLucky(){
+let result=Math.random()<0.5?'Ja':'Nein';
+if(result==='Ja') yesCount++; else noCount++;
+document.getElementById('gameMsg').textContent=`Du hast ${result} gerollt. Ja: ${yesCount}, Nein: ${noCount}`;
+if(yesCount>=5){document.getElementById('gameMsg').textContent+=' 🎉 Du hast gewonnen!';currentUser.coins+=3;if(Math.random()<0.02){currentUser.diamonds+=1;document.getElementById('gameMsg').textContent+=' 💎 Du hast 1 Diamond erhalten!';}yesCount=0;noCount=0;saveUserData();}
+else if(noCount>=5){document.getElementById('gameMsg').textContent+=' 😢 Du hast verloren!';yesCount=0;noCount=0;saveUserData();}
+updateAccountDisplay();
+}
+
+// ACCOUNT
+function openAccount(){document.getElementById('menuBox').style.display='none';document.getElementById('accountBox').style.display='block';updateAccountDisplay();}
+function closeAccount(){saveUserData();document.getElementById('accountBox').style.display='none';document.getElementById('menuBox').style.display='block';}
+function updateAccountDisplay(){if(currentUser){document.getElementById('diamondsDisplay').textContent=`Diamonds: ${currentUser.diamonds}`;document.getElementById('coinsDisplay').textContent=`Coins: ${currentUser.coins}`;document.getElementById('accountInfo').innerHTML=`Name: ${currentUser.name}<br>Code: ${currentUser.code}<br>Securitycode: ${currentUser.security}`;}}
+
+// ADMIN
+function openAdmin(){if(!currentUser||currentUser.role!=='admin'){alert('Keine Berechtigung!');return;}document.getElementById('adminPanel').style.display='block';}
+function closeAdmin(){document.getElementById('adminPanel').style.display='none';}
+function banUser(){let target=document.getElementById('banName').value.trim();let days=parseInt(document.getElementById('banDays').value);if(!target||isNaN(days)) return;localStorage.setItem('ban_'+target,Date.now()+days*86400000);alert(target+' wurde gebannt für '+days+' Tage.');}
+function giveCoins(){let target=document.getElementById('giveName').value.trim();let amount=parseInt(document.getElementById('giveCoinsAmount').value);if(!target||isNaN(amount)) return;let user=users.find(u=>u.name===target);if(!user){alert('User existiert nicht');return;}user.coins+=amount;saveUserData();alert('Coins gegeben!');updateAccountDisplay();}
+function adminSay(){let msg=document.getElementById('sayMessage').value;if(!msg)return;document.getElementById('globalMessage').textContent=msg;}
+
+applyTheme();
+</script>
+</body>
+</html>
