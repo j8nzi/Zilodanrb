@@ -1,115 +1,95 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nachrichten Board</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f9;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .container {
-            background: white;
-            width: 400px;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            display: flex;
-            flex-direction: column;
-        }
-        h1 {
-            text-align: center;
-            font-size: 20px;
-        }
-        textarea {
-            resize: none;
-            height: 60px;
-            margin-bottom: 10px;
-            padding: 8px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-        }
-        button {
-            padding: 8px;
-            border: none;
-            border-radius: 8px;
-            background-color: #4CAF50;
-            color: white;
-            cursor: pointer;
-        }
-        button:disabled {
-            background-color: #aaa;
-            cursor: not-allowed;
-        }
-        .messages {
-            margin-top: 15px;
-            max-height: 200px;
-            overflow-y: auto;
-            border-top: 1px solid #eee;
-            padding-top: 10px;
-        }
-        .message {
-            background: #f1f1f1;
-            padding: 6px;
-            border-radius: 6px;
-            margin-bottom: 6px;
-            font-size: 14px;
-        }
-        .counter {
-            font-size: 12px;
-            margin-bottom: 8px;
-            color: #555;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Öffentliche Textwand</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    textarea {
+      width: 100%;
+      height: 80px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 8px 12px;
+    }
+    .message {
+      border-bottom: 1px solid #ccc;
+      padding: 8px 0;
+    }
+    #info {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
+  <h1>Öffentliche Textwand</h1>
+  <p>Jeder darf nur 5 Nachrichten pro Tag schreiben.</p>
 
-<div class="container">
-    <h1>Nachrichten Board</h1>
-    <div class="counter" id="counter">Du kannst noch 5 Nachrichten schreiben.</div>
-    <textarea id="messageInput" placeholder="Deine Nachricht..."></textarea>
-    <button id="sendButton">Senden</button>
-    <div class="messages" id="messages"></div>
-</div>
+  <textarea id="messageInput" placeholder="Deine Nachricht..."></textarea>
+  <br>
+  <button onclick="sendMessage()">Senden</button>
+  <p id="info"></p>
 
-<script>
-    const maxMessages = 5;
-    let messageCount = 0;
+  <h2>Nachrichten:</h2>
+  <div id="messages"></div>
 
-    const input = document.getElementById("messageInput");
-    const button = document.getElementById("sendButton");
-    const messagesDiv = document.getElementById("messages");
-    const counter = document.getElementById("counter");
+  <script>
+    function getToday() {
+      return new Date().toISOString().split('T')[0];
+    }
 
-    button.addEventListener("click", () => {
-        const text = input.value.trim();
-        if (text === "" || messageCount >= maxMessages) return;
+    function loadMessages() {
+      const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+      const container = document.getElementById('messages');
+      container.innerHTML = '';
 
-        const messageElement = document.createElement("div");
-        messageElement.classList.add("message");
-        messageElement.textContent = text;
+      messages.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = 'message';
+        div.textContent = msg.text + " (" + msg.date + ")";
+        container.appendChild(div);
+      });
+    }
 
-        messagesDiv.appendChild(messageElement);
-        input.value = "";
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      if (!text) return;
 
-        messageCount++;
-        const remaining = maxMessages - messageCount;
-        counter.textContent = remaining > 0
-            ? `Du kannst noch ${remaining} Nachrichten schreiben.`
-            : "Du hast dein Limit erreicht.";
+      const today = getToday();
+      const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+      const userCountData = JSON.parse(localStorage.getItem('dailyCount') || '{}');
 
-        if (messageCount >= maxMessages) {
-            button.disabled = true;
-            input.disabled = true;
-        }
-    });
-</script>
+      if (!userCountData[today]) {
+        userCountData[today] = 0;
+      }
 
+      if (userCountData[today] >= 5) {
+        document.getElementById('info').textContent = "Du hast heute schon 5 Nachrichten gesendet.";
+        return;
+      }
+
+      messages.push({ text: text, date: today });
+      userCountData[today]++;
+
+      localStorage.setItem('messages', JSON.stringify(messages));
+      localStorage.setItem('dailyCount', JSON.stringify(userCountData));
+
+      input.value = '';
+      document.getElementById('info').textContent = "Nachricht gesendet!";
+      loadMessages();
+    }
+
+    loadMessages();
+  </script>
 </body>
 </html>
+
